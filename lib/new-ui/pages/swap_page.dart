@@ -93,6 +93,70 @@ class _NewSwapPageState extends State<NewSwapPage> {
           .contains(widget.exchangeViewModel.depositCurrency) &&
       !(widget.exchangeViewModel.status is SyncedSyncStatus);
 
+  void _showErleoProcessing(TradeIsErleoPending state) {
+    showPopUp<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertWithOneAction(
+          alertTitle: S.of(context).processing,
+          alertContent: S.of(context).erleo_processing_message,
+          buttonText: S.of(context).cancel,
+          buttonAction: () {
+            widget.exchangeViewModel.cancelErleoWait();
+            Navigator.of(context).pop();
+          },
+        );
+      },
+    );
+  }
+
+  void _showErleoApproved(TradeIsErleoApproved state) {
+    Navigator.of(context).pop(); // cerrar popup de procesando si está abierto
+    showPopUp<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertWithOneAction(
+          alertTitle: S.of(context).erleo_approved_title,
+          alertContent: S.of(context).erleo_approved_message,
+          buttonText: S.of(context).ok,
+          buttonAction: () => Navigator.of(context).pop(),
+        );
+      },
+    );
+  }
+
+  void _showErleoCompleted(TradeIsErleoCompleted state) {
+    Navigator.of(context).pop();
+    showPopUp<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertWithOneAction(
+          alertTitle: S.of(context).erleo_completed_title,
+          alertContent: S.of(context).erleo_completed_message,
+          buttonText: S.of(context).ok,
+          buttonAction: () => Navigator.of(context).pop(),
+        );
+      },
+    );
+  }
+
+  void _showErleoRejected(TradeIsErleoRejected state) {
+    Navigator.of(context).pop();
+    showPopUp<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertWithOneAction(
+          alertTitle: S.of(context).provider_error(S.current.trade_not_created),
+          alertContent: S.of(context).amount_is_below_minimum_limit(
+              widget.exchangeViewModel.limits.min?.toString() ?? ''),
+          buttonText: S.of(context).ok,
+          buttonAction: () => Navigator.of(context).pop(),
+        );
+      },
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -226,6 +290,49 @@ class _NewSwapPageState extends State<NewSwapPage> {
           (bool isReceiveAmountEditable) {});
 
       reaction((_) => widget.exchangeViewModel.tradeState, (ExchangeTradeState state) {
+        if (state is TradeIsErleoPending) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _showErleoProcessing(state);
+            }
+          });
+        }
+        if (state is TradeIsErleoApproved) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _showErleoApproved(state);
+            }
+          });
+        }
+        if (state is TradeIsErleoCompleted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _showErleoCompleted(state);
+            }
+          });
+        }
+        if (state is TradeIsErleoRejected) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _showErleoRejected(state);
+            }
+          });
+        }
+        if (state is TradeIsErleoError) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              showPopUp<void>(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertWithOneAction(
+                        alertTitle: S.of(context).provider_error(S.current.trade_not_created),
+                        alertContent: state.error,
+                        buttonText: S.of(context).ok,
+                        buttonAction: () => Navigator.of(context).pop());
+                  });
+            }
+          });
+        }
         if (state is TradeIsCreatedFailure) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
@@ -710,7 +817,8 @@ class _NewSwapPageState extends State<NewSwapPage> {
                                 color: Theme.of(context).colorScheme.primary,
                                 textColor: Theme.of(context).colorScheme.onPrimary,
                                 isDisabled: _swapButtonDisabled(),
-                                isLoading: widget.exchangeViewModel.tradeState is TradeIsCreating,
+                                isLoading: widget.exchangeViewModel.tradeState is TradeIsCreating ||
+                                    widget.exchangeViewModel.tradeState is TradeIsErleoPending,
                               ),
                             ),
                           ],
@@ -738,8 +846,11 @@ class _NewSwapPageState extends State<NewSwapPage> {
 
     // Sin tasa disponible (sin proveedor con cotización): bloquea el botón
     // y deja que SwapProviderPreview muestre el aviso "no hay proveedores".
+    // PERO si el monto está por debajo del mínimo y el Cerebro puede procesar
+    // la orden (intercambio propio), el botón debe quedar habilitado.
     if (widget.exchangeViewModel.hasCompletedProviderSearch &&
-        !widget.exchangeViewModel.hasAvailableProviders) {
+        !widget.exchangeViewModel.hasAvailableProviders &&
+        !widget.exchangeViewModel.canUseErleoForBelowMin) {
       return true;
     }
 

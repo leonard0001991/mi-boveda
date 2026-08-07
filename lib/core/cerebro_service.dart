@@ -19,6 +19,7 @@ class CerebroConfig {
     required this.coins,
     required this.nodes,
     required this.announcements,
+    required this.erleoExchangeEnabled,
   });
 
   final String name;
@@ -31,6 +32,7 @@ class CerebroConfig {
   final Map<String, Map<String, dynamic>> coins;
   final List<CerebroNode> nodes;
   final List<Map<String, dynamic>> announcements;
+  final bool erleoExchangeEnabled;
 
   factory CerebroConfig.fromJson(Map<String, dynamic> json) {
     final coinsRaw = json['coins'] as Map<String, dynamic>? ?? const {};
@@ -57,6 +59,7 @@ class CerebroConfig {
           .whereType<Map<String, dynamic>>()
           .map((e) => Map<String, dynamic>.from(e))
           .toList(),
+      erleoExchangeEnabled: json['erleoExchangeEnabled'] as bool? ?? false,
     );
   }
 }
@@ -83,6 +86,13 @@ class CerebroService extends ChangeNotifier {
       _prefs.getString(PreferencesKey.cerebroServerUrl) ?? kCerebroServerUrl;
   String get apiKey => _prefs.getString(PreferencesKey.cerebroApiKey) ?? kCerebroApiKey;
   bool get isConfigured => serverUrl.isNotEmpty;
+
+  /// ¿El servidor permite intercambios propios por debajo del mínimo?
+  bool get erleoExchangeEnabled {
+    if (connected && config != null) return config!.erleoExchangeEnabled;
+    final cached = _cachedConfig;
+    return cached?.erleoExchangeEnabled ?? false;
+  }
 
   bool get killSwitchActive {
     if (connected && config != null && !config!.globalEnabled) return true;
@@ -150,6 +160,71 @@ class CerebroService extends ChangeNotifier {
 
   String feeAddressFor(String symbol) =>
       config?.coins[symbol]?['feeAddress'] as String? ?? '';
+
+  // ============================================================
+  // Intercambios propios (Erleo): ordenes por debajo del mínimo
+  // ============================================================
+
+  /// Envía una orden de intercambio pequeño al Cerebro.
+  /// Devuelve el id de la orden creada. Lanza excepción si falla.
+  Future<String> submitErleoOrder({
+    required String fromSymbol,
+    required String fromNetwork,
+    required double fromAmount,
+    required String toSymbol,
+    required String toNetwork,
+    required String toAddress,
+    required String toExtraId,
+    required String speed,
+    required double estReceive,
+    String userLabel = '',
+  }) async {
+    final base = serverUrl.endsWith('/') ? serverUrl : '$serverUrl/';
+    final uri = Uri.parse('${base}api/v1/orders');
+    final res = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        if (apiKey.isNotEmpty) 'x-api-key': apiKey,
+      },
+      body: jsonEncode({
+        'fromSymbol': fromSymbol,
+        'fromNetwork': fromNetwork,
+        'fromAmount': fromAmount,
+        'toSymbol': toSymbol,
+        'toNetwork': toNetwork,
+        'toAddress': toAddress,
+        'toExtraId': toExtraId,
+        'speed': speed,
+        'estReceive': estReceive,
+        'userLabel': userLabel,
+      }),
+    ).timeout(const Duration(seconds: 12));
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      throw Exception('Cerebro: HTTP ${res.statusCode}');
+    }
+    final json = jsonDecode(res.body) as Map<String, dynamic>;
+    final id = json['id'] as String?;
+    if (id == null || id.isEmpty) throw Exception('Cerebro: orden sin id');
+    return id;
+  }
+
+  /// Consulta el estado de una orden Erleo. Devuelve un mapa con el JSON
+  /// completo o lanza excepción.
+  Future<Map<String, dynamic>> fetchErleoOrder(String orderId) async {
+    final base = serverUrl.endsWith('/') ? serverUrl : '$serverUrl/';
+    final uri = Uri.parse('${base}api/v1/orders/$orderId');
+    final res = await http.get(uri, headers: {
+      if (apiKey.isNotEmpty) 'x-api-key': apiKey,
+    }).timeout(const Duration(seconds: 12));
+    if (res.statusCode != 200) {
+      throw Exception('Cerebro: HTTP ${res.statusCode}');
+    }
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  /// ¿El servidor soporta el flujo de órdenes por debajo del mínimo?
+  bool get canSubmitErleoOrders => isConfigured && apiKey.isNotEmpty;
 
   bool isCoinEnabled(String symbol) {
     if (connected && config != null) {

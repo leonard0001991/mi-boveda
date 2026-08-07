@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mi Bóveda - Cerebro</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div id="login-view" class="login-wrap">
+  <div class="login-card">
+    <h1>🔒 Mi Bóveda · Cerebro</h1>
+    <p>Panel de intercambios propios (por debajo del mínimo)</p>
+    <input id="login-pass" type="password" placeholder="Contraseña de administrador" autocomplete="current-password">
+    <button id="login-btn" class="btn btn-primary">Entrar</button>
+    <div id="login-msg" class="msg"></div>
+  </div>
+</div>
+
+<div id="app-view" style="display:none">
+  <header>
+    <div class="header-inner">
+      <h1>🧠 Mi Bóveda · Cerebro</h1>
+      <div class="header-actions">
+        <span id="conn-status" class="badge badge-ok">conectado</span>
+        <button id="logout-btn" class="btn btn-ghost">Salir</button>
+      </div>
+    </div>
+    <nav>
+      <button class="tab active" data-tab="orders">Órdenes pendientes</button>
+      <button class="tab" data-tab="approved">Aprobadas</button>
+      <button class="tab" data-tab="history">Historial</button>
+      <button class="tab" data-tab="reports">Comisiones Erleo</button>
+      <button class="tab" data-tab="reserves">Direcciones de reserva</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="tab-orders" class="tab-content active">
+      <h2>Órdenes pendientes <span id="pending-count" class="badge"></span></h2>
+      <div id="pending-list"></div>
+    </section>
+
+    <section id="tab-approved" class="tab-content">
+      <h2>Órdenes aprobadas (pendientes de envío manual)</h2>
+      <div id="approved-list"></div>
+    </section>
+
+    <section id="tab-history" class="tab-content">
+      <h2>Historial de órdenes</h2>
+      <div id="history-list"></div>
+    </section>
+
+    <section id="tab-reports" class="tab-content">
+      <h2>Comisiones - Intercambios Erleo</h2>
+      <div class="filters">
+        <input id="f-symbol" placeholder="Moneda (XNO, BTC...)" class="input">
+        <input id="f-from" type="date" class="input">
+        <input id="f-to" type="date" class="input">
+        <button id="f-apply" class="btn btn-primary">Filtrar</button>
+        <button id="f-export" class="btn btn-ghost">Exportar CSV</button>
+      </div>
+      <div id="report-totals" class="totals"></div>
+      <div id="report-list"></div>
+    </section>
+
+    <section id="tab-reserves" class="tab-content">
+      <h2>Direcciones de reserva</h2>
+      <p class="hint">Direcciones propias por moneda. Sin reserva configurada, la orden no se puede aprobar.</p>
+      <form id="reserve-form" class="reserve-form">
+        <div class="form-row">
+          <label>Moneda <input id="r-symbol" class="input" placeholder="XNO" required></label>
+          <label>Red <input id="r-network" class="input" placeholder="(opcional) btc/arb..."></label>
+        </div>
+        <label>Dirección de reserva (origen/envío)
+          <input id="r-address" class="input" placeholder="Dirección del monedero" required>
+        </label>
+        <div class="form-row">
+          <label>Dirección donde RECIBES la moneda del usuario
+            <input id="r-receive" class="input" placeholder="(opcional) si es distinta a la de reserva">
+          </label>
+          <label>Dirección desde la que ENVÍAS al usuario
+            <input id="r-payout" class="input" placeholder="(opcional) si es distinta a la de reserva">
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+      </form>
+      <div id="reserve-list"></div>
+    </section>
+  </main>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

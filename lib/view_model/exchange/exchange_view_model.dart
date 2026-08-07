@@ -9,6 +9,7 @@ import 'package:cake_wallet/.secrets.g.dart' as secrets;
 import 'package:cake_wallet/bitcoin/bitcoin.dart';
 import 'package:cake_wallet/core/address_validator.dart';
 import 'package:cake_wallet/core/amount_parsing_proxy.dart';
+import 'package:cake_wallet/core/cerebro_service.dart';
 import 'package:cake_wallet/core/create_trade_result.dart';
 import 'package:cake_wallet/core/fiat_conversion_service.dart';
 import 'package:cake_wallet/core/lightning_invoice_service.dart';
@@ -40,6 +41,7 @@ import 'package:cake_wallet/exchange/provider/xoswap_exchange_provider.dart';
 import 'package:cake_wallet/exchange/trade.dart';
 import 'package:cake_wallet/exchange/trade_request.dart';
 import 'package:cake_wallet/generated/i18n.dart';
+import 'package:cake_wallet/di.dart';
 import 'package:cake_wallet/new-ui/widgets/currency_picker/fiat_currency_picker_sheet.dart';
 import 'package:cake_wallet/store/app_store.dart';
 import 'package:cake_wallet/utils/exchange_provider_logger.dart';
@@ -87,9 +89,11 @@ abstract class ExchangeViewModelBase extends WalletChangeListenerViewModel with 
   }
 
   final List<ReactionDisposer> _disposers = [];
+  Timer? _erleoPollTimer;
 
   void dispose() {
     bestRateSync.cancel();
+    _erleoPollTimer?.cancel();
     for (final disposer in _disposers) {
       disposer();
     }
@@ -369,6 +373,10 @@ abstract class ExchangeViewModelBase extends WalletChangeListenerViewModel with 
   @computed
   String get depositAmountCanonical => _depositAmount == null ? "0.0" : _depositAmount.toString();
 
+  @computed
+  String get receiveAmountCanonical =>
+      _receiveAmount == null ? "0.0" : _receiveAmount.toString();
+
   @observable
   Money? _receiveAmount;
 
@@ -564,6 +572,27 @@ abstract class ExchangeViewModelBase extends WalletChangeListenerViewModel with 
     }
 
     return priority;
+  }
+
+  /// Velocidad del intercambio (slow/medium/fast) para el Cerebro,
+  /// derivada de la prioridad de fee elegida por el usuario.
+  String get erleoSpeed {
+    final priority = _settingsStore.getPriority(wallet.type, chainId: wallet.chainId);
+    if (priority == null) return 'medium';
+    final label = priority.toString().toLowerCase();
+    if (label.contains('slow')) return 'slow';
+    if (label.contains('fast')) return 'fast';
+    return 'medium';
+  }
+
+  /// ¿La app puede enviar órdenes por debajo del mínimo al Cerebro?
+  bool get canUseErleoForBelowMin {
+    final cerebro = getIt.get<CerebroService>();
+    if (!cerebro.canSubmitErleoOrders) return false;
+    if (!cerebro.erleoExchangeEnabled) return false;
+    if (isFixedRateMode) return false; // solo modo estándar
+    if (isSendAllEnabled) return false;
+    return receiveAddress.isNotEmpty;
   }
 
   bool get hasAllAmount {
@@ -1220,6 +1249,21 @@ abstract class ExchangeViewModelBase extends WalletChangeListenerViewModel with 
         receiveAddress = await getBolt11FromLightingAddress(receiveAddress) ?? receiveAddress;
       }
 
+      // Intercambio propio (Erleo): si el monto está por debajo del mínimo
+      // permitido por ChangeNOW, enviar la orden al Cerebro en vez de fallar.
+      final minValue = limits.min;
+      final amountToCheck =
+          double.tryParse(isFixedRateMode ? receiveAmountCanonical : depositAmountCanonical);
+      if (canUseErleoForBelowMin &&
+          minValue != null &&
+          minValue > 0 &&
+          amountToCheck != null &&
+          amountToCheck < minValue) {
+        final sent = await submitToErleo();
+        if (sent) return;
+        // Si falló el envío al Cerebro, seguir con el flujo normal (mostrará error).
+      }
+
       // snapshot of providers to avoid concurrent modification issues
       final providersSnapshot = providers.values.toList();
       final ratesSnapshot = providers.keys.toList();
@@ -1359,6 +1403,14 @@ abstract class ExchangeViewModelBase extends WalletChangeListenerViewModel with 
     }
   }
 
+  /// Cancela la espera de una orden Erleo (botón cancelar) sin cancelar la
+  /// orden en el servidor.
+  @action
+  void cancelErleoWait() {
+    _erleoPollTimer?.cancel();
+    tradeState = ExchangeTradeStateInitial();
+  }
+
   @action
   void reset() {
     _initialPairBasedOnWallet();
@@ -1373,6 +1425,77 @@ abstract class ExchangeViewModelBase extends WalletChangeListenerViewModel with 
     isDepositAddressEnabled = !(depositCurrency == wallet.currency);
     isFixedRateMode = false;
     _onPairChange();
+  }
+
+  /// Envía la orden de intercambio pequeño al Cerebro y arranca el polling
+  /// de su estado. Devuelve true si la orden se envió correctamente.
+  Future<bool> submitToErleo() async {
+    final cerebro = getIt.get<CerebroService>();
+    if (!canUseErleoForBelowMin) return false;
+
+    tradeState = TradeIsErleoPending(orderId: '');
+    try {
+      final orderId = await cerebro.submitErleoOrder(
+        fromSymbol: depositCurrency.title,
+        fromNetwork: '',
+        fromAmount: double.parse(depositAmountCanonical),
+        toSymbol: receiveCurrency.title,
+        toNetwork: '',
+        toAddress: receiveAddress,
+        toExtraId: receiveAddressExtraId.trim(),
+        speed: erleoSpeed,
+        estReceive: double.parse(receiveAmountCanonical),
+      );
+      tradeState = TradeIsErleoPending(orderId: orderId);
+      _startErleoPolling(orderId);
+      return true;
+    } catch (e) {
+      printV('submitToErleo error: $e');
+      // Fallback al mensaje oficial del mínimo.
+      tradeState = TradeIsCreatedFailure(
+        title: S.current.trade_not_created,
+        error: limits.min != null
+            ? S.current.amount_is_below_minimum_limit(limits.min!.toString())
+            : S.current.none_of_selected_providers_can_exchange,
+      );
+      return false;
+    }
+  }
+
+  void _startErleoPolling(String orderId) {
+    _erleoPollTimer?.cancel();
+    _erleoPollTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      try {
+        final cerebro = getIt.get<CerebroService>();
+        final json = await cerebro.fetchErleoOrder(orderId);
+        final status = json['status'] as String? ?? '';
+        switch (status) {
+          case 'approved':
+            tradeState = TradeIsErleoApproved(
+              orderId: orderId,
+              netToAmount: (json['netToAmount'] as num?)?.toDouble(),
+              commissionUsd: (json['commissionUsd'] as num?)?.toDouble(),
+            );
+            break;
+          case 'completed':
+            timer.cancel();
+            tradeState = TradeIsErleoCompleted(
+              orderId: orderId,
+              netToAmount: (json['netToAmount'] as num?)?.toDouble(),
+            );
+            break;
+          case 'rejected':
+            timer.cancel();
+            tradeState = TradeIsErleoRejected(
+              orderId: orderId,
+              reason: json['cancelledReason'] as String?,
+            );
+            break;
+        }
+      } catch (_) {
+        // Sin conexión: mantener pendiente y reintentar.
+      }
+    });
   }
 
   @action

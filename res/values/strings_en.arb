@@ -1464,5 +1464,10 @@
   "zcash_card_enable_later": "You can always enable this card later in settings",
   "zcash_card_missing_funds": "Missing funds?",
   "zcash_card_scan": "Scan",
-  "zcash_card_warning": "Do not close the app until the procedure completes, if you do so this process will need to restart from scratch."
+  "zcash_card_warning": "Do not close the app until the procedure completes, if you do so this process will need to restart from scratch.",
+  "erleo_processing_message": "Processing your exchange…",
+  "erleo_approved_title": "Exchange approved",
+  "erleo_approved_message": "Your exchange was approved and is being processed. You will receive the final amount shortly.",
+  "erleo_completed_title": "Exchange completed",
+  "erleo_completed_message": "Your exchange was completed successfully."
 }

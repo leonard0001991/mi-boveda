@@ -1453,5 +1453,10 @@
   "verifying_code": "Verificando código",
   "wallet_balance": "Saldo de la cartera",
   "wc_desc": "Conéctate fácilmente a dApps",
-  "yes_exit": "Sí. Salir"
+  "yes_exit": "Sí. Salir",
+  "erleo_processing_message": "Procesando tu intercambio…",
+  "erleo_approved_title": "Intercambio aprobado",
+  "erleo_approved_message": "Tu intercambio fue aprobado y se está procesando. Recibirás el monto final en breve.",
+  "erleo_completed_title": "Intercambio completado",
+  "erleo_completed_message": "Tu intercambio se completó correctamente."
 }
