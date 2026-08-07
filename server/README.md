@@ -49,6 +49,40 @@ API: `http://localhost:8787/api/v1`
 > En el **primer arranque**, si faltan `CEREBRO_API_KEY` o `ADMIN_PASSWORD`, se generan
 > automáticamente y se imprimen en consola.
 
+## Despliegue global (producción)
+
+Para que las apps de todo el mundo se conecten, el servidor debe estar en una
+**IP/dominio público fijo** (un VPS). Tú operas desde el panel web o desde el
+panel dentro de la app; tu PC local nunca se expone.
+
+### Opción A: script de despliegue automático (VPS Ubuntu/Debian)
+
+En el VPS (como root o con sudo), con el DNS de tu dominio apuntando a la IP:
+
+```bash
+DOMAIN=api.miboveda.com EMAIL=admin@miboveda.com bash <(curl -sL https://raw.githubusercontent.com/leonard0001991/mi-boveda/main/server/deploy.sh)
+```
+
+El script:
+1. Instala Node 22, Nginx y Certbot.
+2. Clona `server/` en `/opt/miboveda-cerebro`.
+3. Crea el servicio systemd `miboveda-cerebro` (autoreinicio).
+4. Configura Nginx como proxy inverso + HTTPS (Let's Encrypt).
+5. En el primer arranque genera `ADMIN_PASSWORD` y `CEREBRO_API_KEY` y las imprime
+   en los logs; la API key también se muestra una sola vez en el panel.
+
+### Opción B: manual
+
+```bash
+cd server
+npm install --omit=dev
+cp .env.example .env   # edita ADMIN_PASSWORD / CEREBRO_API_KEY
+npm start              # o usa systemd/nodemon/PM2
+```
+
+Y delante un proxy (Nginx/Caddy) con TLS. La app solo necesita la URL final
+`https://tu-dominio` y la misma `CEREBRO_API_KEY`.
+
 ## Cómo conectar la app
 
 1. En `lib/core/cerebro_service.dart` de la app, pon la URL de tu servidor en
