@@ -1,11 +1,22 @@
 import crypto from 'node:crypto';
+import { getSetting, setSetting } from '../db/index.js';
 
 const sessions = new Map(); // token -> { user, expiresAt }
+
+// La API key se guarda en la DB (settings) para poder generarla una sola vez
+// y mostrarla/regenerarla desde el panel. Si no existe, se usa la de .env.
+export function cerebroApiKey() {
+  return getSetting('apiKey') || process.env.CEREBRO_API_KEY || '';
+}
+
+export function setCerebroApiKey(key) {
+  return setSetting('apiKey', key);
+}
 
 // Auth para endpoints de la billetera (header x-api-key).
 export function apiKeyAuth(req, res, next) {
   const provided = req.get('x-api-key') || req.get('x-cerebro-api-key') || '';
-  const expected = process.env.CEREBRO_API_KEY || '';
+  const expected = cerebroApiKey();
   if (!expected) {
     return res.status(500).json({ error: 'CEREBRO_API_KEY no configurada en el servidor' });
   }

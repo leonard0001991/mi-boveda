@@ -85,6 +85,7 @@
   static const domainLookupsPage = '/domain_lookups_page';
   static const displaySettingsPage = '/display_settings_page';
   static const otherSettingsPage = '/other_settings_page';
+  static const cerebroPanel = '/cerebro_panel';
   static const advancedPrivacySettings = '/advanced_privacy_settings';
   static const sweepingWalletPage = '/sweeping_wallet_page';
   static const walletPasswordUnlock = '/wallet_password_unlock';

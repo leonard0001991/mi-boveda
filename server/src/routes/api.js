@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { db, nowIso } from '../db/index.js';
-import { apiKeyAuth, sessionAuth, createSession } from '../middleware/auth.js';
+import crypto from 'node:crypto';
+import { db, nowIso, getSetting, setSetting } from '../db/index.js';
+import { apiKeyAuth, sessionAuth, createSession, cerebroApiKey, setCerebroApiKey } from '../middleware/auth.js';
 import * as ordersService from '../services/orders.js';
 import * as reportsService from '../services/reports.js';
 import { NORMAL_COMMISSION, commissionUsdFor, specialCommissionFor } from '../services/commission.js';
@@ -38,6 +39,12 @@ function buildConfig() {
     .get('globalEnabled');
   const globalEnabled = globalEnabledRaw ? globalEnabledRaw.value === '1' : true;
 
+  const erleoEnabledRaw = db
+    .prepare('SELECT value FROM settings WHERE key = ?')
+    .get('erleoExchangeEnabled');
+  // Por defecto el sistema Erleo está ACTIVADO; el panel puede detenerlo con un clic.
+  const erleoExchangeEnabled = erleoEnabledRaw ? erleoEnabledRaw.value === '1' : true;
+
   const specials = db.prepare('SELECT * FROM small_order_commission').all();
   const specialCommissions = {};
   for (const sp of specials) specialCommissions[sp.symbol] = sp.specialUsd;
@@ -54,7 +61,7 @@ function buildConfig() {
     specialCommissions,
     nodes: {},
     announcements: [],
-    erleoExchangeEnabled: true,
+    erleoExchangeEnabled,
   };
 }
 
@@ -103,6 +110,52 @@ router.post('/orders/:id/complete', sessionAuth, async (req, res) => {
   const result = await ordersService.completeOrder(req.params.id, req.body || {});
   if (result.error) return res.status(400).json({ error: result.error });
   res.json(result.order);
+});
+
+// ============================================================
+// Toggle Erleo (sistema de intercambios propios)
+// ============================================================
+// GET /api/v1/settings/erleo-enabled - lee el estado actual (permite el dashboard).
+router.get('/settings/erleo-enabled', (req, res) => {
+  res.json(buildConfig().erleoExchangeEnabled);
+});
+
+// POST /api/v1/settings/erleo-enabled - admin enciende/apaga con un clic (persistente).
+router.post('/settings/erleo-enabled', sessionAuth, (req, res) => {
+  const enabled = !!(req.body && req.body.enabled);
+  db.prepare(`
+    INSERT INTO settings (key, value) VALUES ('erleoExchangeEnabled', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(enabled ? '1' : '0');
+  res.json({ enabled });
+});
+
+// ============================================================
+// API key de la app (se muestra UNA SOLA VEZ en el panel)
+// ============================================================
+// GET /api/v1/settings/api-key - devuelve la key la primera vez; despues solo
+// la ultima parte para confirmar que es la misma.
+router.get('/settings/api-key', sessionAuth, (req, res) => {
+  const key = cerebroApiKey();
+  const shown = getSetting('apiKeyShown') === '1';
+  res.json({
+    apiKey: key,
+    revealedOnce: shown,
+  });
+});
+
+// POST /api/v1/settings/api-key/reveal - marca como vista (ya no se vuelve a mostrar completa).
+router.post('/settings/api-key/reveal', sessionAuth, (req, res) => {
+  setSetting('apiKeyShown', '1');
+  res.json({ ok: true });
+});
+
+// POST /api/v1/settings/api-key/regenerate - genera una key nueva (la app debe actualizarse).
+router.post('/settings/api-key/regenerate', sessionAuth, (req, res) => {
+  const key = 'cerebro_' + crypto.randomBytes(24).toString('hex');
+  setCerebroApiKey(key);
+  setSetting('apiKeyShown', '1');
+  res.json({ apiKey: key });
 });
 
 // ============================================================

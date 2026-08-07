@@ -23,6 +23,7 @@
       <h1>🧠 Mi Bóveda · Cerebro</h1>
       <div class="header-actions">
         <span id="conn-status" class="badge badge-ok">conectado</span>
+        <button id="erleo-toggle" class="btn btn-erleo-on">🟢 Activar intercambios</button>
         <button id="logout-btn" class="btn btn-ghost">Salir</button>
       </div>
     </div>
@@ -32,6 +33,7 @@
       <button class="tab" data-tab="history">Historial</button>
       <button class="tab" data-tab="reports">Comisiones Erleo</button>
       <button class="tab" data-tab="reserves">Direcciones de reserva</button>
+      <button class="tab" data-tab="apikey">Clave API</button>
     </nav>
   </header>
 
@@ -86,6 +88,20 @@
         <button type="submit" class="btn btn-primary">Guardar</button>
       </form>
       <div id="reserve-list"></div>
+    </section>
+
+    <section id="tab-apikey" class="tab-content">
+      <h2>Clave API de la app</h2>
+      <p class="hint">Esta clave viaja en cada build de la app para que las apps se conecten a tu servidor. Se muestra solo la primera vez: cópiala y pégala en el código (<code>kCerebroApiKey</code>) antes de compilar.</p>
+      <div class="card">
+        <div id="apikey-content" class="apikey-box">
+          <span id="apikey-shown" class="mono"></span>
+          <div class="actions">
+            <button id="apikey-copy" class="btn btn-primary">📋 Copiar</button>
+            <button id="apikey-regenerate" class="btn btn-danger">🔄 Regenerar</button>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 </div>

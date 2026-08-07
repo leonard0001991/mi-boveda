@@ -58,6 +58,10 @@ h2 { font-size: 16px; margin-bottom: 16px; display: flex; align-items: center; g
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-danger:hover { background: #da3633; }
 .btn-warn { background: var(--warn); color: #1c1200; }
+.btn-erleo-on { background: var(--danger); color: #fff; }
+.btn-erleo-on:hover { background: #da3633; }
+.btn-erleo-off { background: var(--primary); color: #fff; }
+.btn-erleo-off:hover { background: var(--primary-hover); }
 
 .input {
   background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
@@ -106,6 +110,12 @@ h2 { font-size: 16px; margin-bottom: 16px; display: flex; align-items: center; g
 .msg.error { color: var(--danger); }
 
 .hint { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.apikey-value {
+  background: #0d1117; border: 1px solid var(--border); border-radius: 6px;
+  padding: 12px; font-size: 13px; word-break: break-all; margin: 12px 0; color: var(--accent);
+}
+.apikey-box { padding: 12px 0; }
 .reserve-form { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px; }
 .reserve-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); flex: 1; }
 .form-row { display: flex; gap: 12px; }

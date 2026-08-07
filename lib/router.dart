@@ -8,6 +8,8 @@ import 'package:cake_wallet/new-ui/pages/bridge/bridge_confirm_sheet.dart';
 import 'package:cake_wallet/new-ui/pages/bridge/bridge_history_page.dart';
 import 'package:cake_wallet/new-ui/pages/bridge/bridge_network_page.dart';
 import 'package:cake_wallet/new-ui/pages/bridge/bridge_receiving_wallet_page.dart';
+import 'package:cake_wallet/core/cerebro_admin_service.dart';
+import 'package:cake_wallet/new-ui/pages/cerebro_panel_page.dart';
 import 'package:cake_wallet/new-ui/pages/coin_control_page.dart';
 import 'package:cake_wallet/new-ui/pages/addresses_page.dart';
 import 'package:cake_wallet/new-ui/pages/lightning_username_page.dart';
@@ -610,6 +612,13 @@ Route<dynamic> createRoute(RouteSettings settings) {
     case Routes.otherSettingsPage:
       return handleRouteWithPlatformAwareness(
         (context) => getIt.get<OtherSettingsPage>(),
+      );
+
+    case Routes.cerebroPanel:
+      return handleRouteWithPlatformAwareness(
+        (context) => CerebroPanelPage(
+          cerebroAdminService: getIt.get<CerebroAdminService>(),
+        ),
       );
 
     case Routes.newNode:

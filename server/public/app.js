@@ -26,6 +26,29 @@ function showApp() {
   $('login-view').style.display = 'none';
   $('app-view').style.display = 'block';
   refreshAll();
+  refreshErleoToggle();
+}
+
+async function refreshErleoToggle() {
+  try {
+    const enabled = await api('/api/v1/settings/erleo-enabled');
+    const btn = $('erleo-toggle');
+    if (enabled) {
+      btn.textContent = '🟢 Activar intercambios';
+      btn.className = 'btn btn-erleo-on';
+    } else {
+      btn.textContent = '🔴 Detener intercambios';
+      btn.className = 'btn btn-erleo-off';
+    }
+  } catch (e) { /* silencioso */ }
+}
+
+async function setErleoEnabled(enabled) {
+  await api('/api/v1/settings/erleo-enabled', {
+    method: 'POST', body: JSON.stringify({ enabled }),
+  });
+  toast(enabled ? 'Intercambios Erleo ACTIVADOS. La app vuelve a ofrecerlos.' : 'Intercambios Erleo DETENIDOS. La app usa solo ChangeNOW.');
+  refreshErleoToggle();
 }
 
 function toast(msg, isError = false) {
@@ -167,10 +190,52 @@ async function refreshReports() {
   </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+async function refreshApiKey() {
+  const { apiKey, revealedOnce } = await api('/api/v1/settings/api-key');
+  const box = $('apikey-content');
+  if (!revealedOnce) {
+    box.innerHTML = `
+      <p>Tu clave API (se muestra una sola vez):</p>
+      <div class="mono apikey-value">${esc(apiKey)}</div>
+      <div class="actions">
+        <button id="apikey-copy" class="btn btn-primary" data-akey="${esc(apiKey)}">📋 Copiar</button>
+        <button id="apikey-done" class="btn btn-ghost">✅ Ya la guardé</button>
+      </div>`;
+    $('apikey-copy').addEventListener('click', () => copyText(apiKey));
+    $('apikey-done').addEventListener('click', async () => {
+      await api('/api/v1/settings/api-key/reveal', { method: 'POST', body: '{}' });
+      toast('Clave marcada como vista. Ya no se volverá a mostrar completa.');
+      refreshApiKey();
+    });
+  } else {
+    box.innerHTML = `
+      <p>La clave ya fue revelada y copiada. No se vuelve a mostrar por seguridad.</p>
+      <p class="hint">Si perdiste la copia, puedes regenerarla (invalidará los builds anteriores).</p>
+      <div class="actions">
+        <button id="apikey-regenerate" class="btn btn-danger">🔄 Regenerar clave</button>
+      </div>`;
+    $('apikey-regenerate').addEventListener('click', async () => {
+      if (!confirm('¿Regenerar la clave API? Las apps ya compiladas con la clave anterior dejarán de conectarse.')) return;
+      try {
+        const r = await api('/api/v1/settings/api-key/regenerate', { method: 'POST', body: '{}' });
+        copyText(r.apiKey);
+        toast('Nueva clave generada y copiada al portapapeles.');
+        refreshApiKey();
+      } catch (e) { toast(e.message, true); }
+    });
+  }
+}
+
+function copyText(text) {
+  navigator.clipboard?.writeText(text).catch(() => {});
+  toast('Copiada al portapapeles.');
+}
+
 function refreshAll() {
   refreshOrders().catch((e) => toast(e.message, true));
   refreshReserves().catch((e) => toast(e.message, true));
   refreshReports().catch((e) => toast(e.message, true));
+  refreshApiKey().catch((e) => toast(e.message, true));
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -197,6 +262,16 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.removeItem('cerebro_token');
     showLogin();
   });
+  $('erleo-toggle').addEventListener('click', async () => {
+    const enabled = await api('/api/v1/settings/erleo-enabled');
+    if (!enabled && !confirm('¿ACTIVAR los intercambios Erleo? Las apps empezarán a enviar órdenes pequeñas de nuevo.')) return;
+    if (enabled && !confirm('¿DETENER los intercambios Erleo? Las apps volverán a ChangeNOW para montos bajos.')) return;
+    try {
+      await setErleoEnabled(!enabled);
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
 
   document.querySelectorAll('.tab').forEach((t) => {
     t.addEventListener('click', () => {
@@ -208,6 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (currentTab === 'orders' || currentTab === 'approved' || currentTab === 'history') refreshOrders();
       if (currentTab === 'reports') refreshReports();
       if (currentTab === 'reserves') refreshReserves();
+      if (currentTab === 'apikey') refreshApiKey();
     });
   });
 

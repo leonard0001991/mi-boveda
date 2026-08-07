@@ -62,6 +62,29 @@ API: `http://localhost:8787/api/v1`
 2. Compila la app. Cuando detecte un monto por debajo del mínimo y el servidor tenga
    `erleoExchangeEnabled: true`, ofrecerá el intercambio propio.
 
+### Clave API: se muestra una sola vez
+
+La clave API la genera el servidor automáticamente (en el primer arranque) y se guarda
+en la DB. En el dashboard, pestaña **Clave API**, se muestra **una sola vez**: cópiala y
+pégala en `kCerebroApiKey` antes de compilar. Después de marcarla como vista ya no
+vuelve a aparecer completa (solo puedes regenerarla, lo que invalida los builds
+anteriores).
+
+## Panel de escritorio (dentro de la app)
+
+Además del dashboard web, la propia app tiene un panel **Intercambios Erleo** (Ajustes >
+Intercambios Erleo) que se conecta al servidor global con la contraseña de
+administrador y permite, desde la app de escritorio:
+
+- Botón grande 🟢 **Activar** / 🔴 **Detener** (un clic, persistente en el servidor).
+- Ver órdenes pendientes del mundo entero y **✅ Aceptar** / **❌ Rechazar**.
+- Marcar envíos como **completados**.
+- Reporte de comisiones y **direcciones de reserva**.
+- Ver/copiar la clave API.
+
+Las órdenes quedan guardadas en el servidor aunque apagues tu PC: al volver, el panel
+muestra todas las pendientes acumuladas.
+
 ## Configuración del dashboard
 
 ### Direcciones de reserva (obligatorio para aprobar)
@@ -106,6 +129,11 @@ Si la dejas en `0`/sin configurar, se usa la regla normal automáticamente.
 | GET/POST | `/api/v1/small-commissions` | sesión | Comisión especial opcional. |
 | GET | `/api/v1/report/commissions` | sesión | Contabilidad separada (filtros por moneda/fechas). |
 | GET | `/api/v1/report/export` | sesión | Export CSV de la contabilidad. |
+| GET | `/api/v1/report/dashboard` | sesión | Resumen del dashboard (pendientes/aprobadas/recientes). |
+| GET/POST | `/api/v1/settings/erleo-enabled` | GET pública, POST sesión | Leer/cambiar el toggle **Activar/Detener** Erleo (persistente). |
+| GET | `/api/v1/settings/api-key` | sesión | Clave API de la app (`revealedOnce` indica si ya se mostró). |
+| POST | `/api/v1/settings/api-key/reveal` | sesión | Marcar la clave como ya mostrada (no vuelve a aparecer completa). |
+| POST | `/api/v1/settings/api-key/regenerate` | sesión | Generar una clave nueva (invalida builds anteriores). |
 | POST | `/api/v1/admin/login` | pública | Login del dashboard. |
 
 ## Seguridad

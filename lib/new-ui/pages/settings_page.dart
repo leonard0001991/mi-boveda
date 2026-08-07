@@ -1,4 +1,6 @@
 import 'package:cake_wallet/core/auth_service.dart';
+import 'package:cake_wallet/core/cerebro_service.dart';
+import 'package:cake_wallet/di.dart';
 import 'package:cake_wallet/entities/new_ui_entities/list_item/list_item.dart';
 import 'package:cake_wallet/entities/new_ui_entities/list_item/list_item_regular_row.dart';
 import 'package:cake_wallet/generated/i18n.dart';
@@ -101,6 +103,27 @@ class SettingsSectionData {
   ]);
 
   static List<SettingsSectionData> all = [walletSettings, appSettings, otherSettings];
+
+  static bool Function(DashboardViewModel) get _cerebroConfigured {
+    final cerebro = getIt.get<CerebroService>();
+    return (_) => cerebro.isConfigured;
+  }
+
+  static SettingsSectionData erleoSettings =
+      SettingsSectionData("Intercambios Erleo", "", [
+    SettingsListItem(
+        "assets/new-ui/settings_row_icons/nodes.svg",
+        "Intercambios Erleo",
+        Routes.cerebroPanel,
+        condition: _cerebroConfigured),
+  ]);
+
+  static List<SettingsSectionData> allWithErleo = [
+    walletSettings,
+    appSettings,
+    erleoSettings,
+    otherSettings,
+  ];
 }
 
 class NewSettingsPage extends StatelessWidget {
@@ -164,7 +187,7 @@ class SettingsMainPage extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Column(
                 spacing: 16,
-                children: SettingsSectionData.all.expand((section) {
+                children: SettingsSectionData.allWithErleo.expand((section) {
                   return [
                     if (section.titleIconPath.isNotEmpty)
                       Padding(
